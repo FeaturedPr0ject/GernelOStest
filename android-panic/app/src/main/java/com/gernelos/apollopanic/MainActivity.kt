@@ -422,20 +422,6 @@ private fun RootPanicApp(
         }
     }
 }
-}(id -u)" != "0" ]; then
-                    echo ROOT_PANIC_NO_ROOT
-                    exit 10
-                fi
-                logcat -b all -d -v threadtime -t 1500 2>&1
-            """.trimIndent()
-        )
-        return when {
-            result.output.contains("ROOT_PANIC_NO_ROOT") -> "Root permission not granted"
-            result.exitCode != 0 -> "Could not read system log: ${result.output.ifBlank { "exit code ${result.exitCode}" }}"
-            result.output.isBlank() -> "No log entries are currently available."
-            else -> result.output
-        }
-    }
 
     private fun rebootDevice(): String {
         val rootCheck = runRootCommand("if [ \"\$(id -u)\" = \"0\" ]; then echo ROOT_OK; else echo NO_ROOT; fi")
