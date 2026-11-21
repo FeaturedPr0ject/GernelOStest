@@ -54,8 +54,30 @@ class MainActivity : ComponentActivity() {
         withContext(Dispatchers.IO) { action() }
 
     private fun triggerPanic(): String {
-        val check = runRootCommand("if [ \"$(id -u)\" = \"0\" ]; then echo ROOT_OK; else echo NO_ROOT; fi")
-        if (!check.output.contains("ROOT_OK")) return "Root permission not granted"
+        val checkScript = """
+            if [ "$(id -u)" != "0" ]; then
+                echo NO_ROOT
+                exit 10
+            fi
+            if [ ! -e /proc/sys/kernel/sysrq ] || [ ! -e /proc/sysrq-trigger ]; then
+                echo UNSUPPORTED
+                exit 11
+            fi
+            if [ ! -w /proc/sysrq-trigger ]; then
+                echo NOT_WRITABLE
+                exit 12
+            fi
+            echo READY
+        """.trimIndent()
+        val check = runRootCommand(checkScript)
+        if (!check.output.contains("READY")) {
+            return when {
+                check.output.contains("NO_ROOT") -> "Root permission not granted"
+                check.output.contains("UNSUPPORTED") -> "Kernel SysRq panic is not supported"
+                check.output.contains("NOT_WRITABLE") -> "SysRq trigger is not writable"
+                else -> "Root check failed: ${check.output.ifBlank { "unknown error" }}"
+            }
+        }
         val command = runRootCommand("echo c > /proc/sysrq-trigger")
         return if (command.exitCode == 0) "Panic command returned without crashing" else "Panic command failed: ${command.output}"
     }
