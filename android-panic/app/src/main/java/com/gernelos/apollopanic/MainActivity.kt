@@ -85,14 +85,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun readSystemLog(): String {
-        val result = runRootCommand(
-            """
-                if [ "${'
-                    exit 10
-                fi
-                logcat -b all -d -v threadtime -t 1500 2>&1
-            """.trimIndent()
-        )
+        val script = """
+            if [ "$(id -u)" != "0" ]; then
+                echo ROOT_PANIC_NO_ROOT
+                exit 10
+            fi
+            logcat -b all -d -v threadtime -t 1500 2>&1
+        """.trimIndent()
+        val result = runRootCommand(script)
         return when {
             result.output.contains("ROOT_PANIC_NO_ROOT") -> "Root permission not granted"
             result.exitCode != 0 -> "Could not read system log: ${result.output.ifBlank { "exit code ${result.exitCode}" }}"
