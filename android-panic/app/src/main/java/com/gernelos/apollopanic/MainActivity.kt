@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
         val check = runRootCommand(checkScript)
         if (check.exitCode != 0 || !check.output.contains("READY")) {
             return when {
-                check.output.contains("NO_ROOT") -> "Root permission not granted"
+                check.exitCode != 0 || check.output.contains("NO_ROOT") -> "Root permission not granted"
                 check.output.contains("UNSUPPORTED") -> "Kernel SysRq panic is not supported"
                 check.output.contains("NOT_WRITABLE") -> "SysRq trigger is not writable"
                 else -> "Root check failed: " + check.output.ifBlank { "unknown error" }
