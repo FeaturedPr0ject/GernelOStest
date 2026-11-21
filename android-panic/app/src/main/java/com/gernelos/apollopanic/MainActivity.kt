@@ -67,32 +67,32 @@ class MainActivity : ComponentActivity() {
         val path = uidFile.absolutePath
         val script = """
             package_info=$(dumpsys package com.android.systemui 2>/dev/null)
-            uid=$(printf '%s\n' "$package_info" | sed -n 's/.*userId=\([0-9][0-9]*\).*/\1/p' | head -n 1)
-            if [ -z "$uid" ]; then
+            uid=$(printf '%s\n' "${'$'}package_info" | sed -n 's/.*userId=\([0-9][0-9]*\).*/\1/p' | head -n 1)
+            if [ -z "${'$'}uid" ]; then
                 echo SYSTEMUI_UID_NOT_FOUND
                 exit 2
             fi
-            printf '%s\n' "$uid" > '$path'
+            printf '%s\n' "${'$'}uid" > '$path'
             saved_uid=$(cat '$path' 2>/dev/null)
-            if [ -z "$saved_uid" ]; then
+            if [ -z "${'$'}saved_uid" ]; then
                 echo UID_TEMP_FILE_FAILED
                 exit 3
             fi
-            pids=$(ps -A -o UID,PID,NAME | awk -v uid="$saved_uid" '$1 == uid && $3 ~ /^com[.]android[.]systemui(:.*)?$/ {print $2}')
-            if [ -z "$pids" ]; then
+            pids=$(ps -A -o UID,PID,NAME | awk -v uid="${'$'}saved_uid" '$1 == uid && $3 ~ /^com[.]android[.]systemui(:.*)?$/ {print $2}')
+            if [ -z "${'$'}pids" ]; then
                 echo SYSTEMUI_PROCESS_NOT_FOUND
                 exit 4
             fi
-            for pid in $pids; do
-                kill -9 "$pid" 2>/dev/null
+            for pid in ${'$'}pids; do
+                kill -9 "${'$'}pid" 2>/dev/null
             done
-            echo "SYSTEMUI_KILLED_UID:$saved_uid"
+            echo "SYSTEMUI_KILLED_UID:${'$'}saved_uid"
         """.trimIndent()
         val result = runRootCommand(script)
         return when {
             result.output.contains("SYSTEMUI_KILLED_UID:") -> {
                 val uid = result.output.substringAfter("SYSTEMUI_KILLED_UID:").trim()
-                "SystemUI stopped. UID $uid saved temporarily."
+                "SystemUI stopped. UID ${'$'}uid saved temporarily."
             }
             result.output.contains("SYSTEMUI_UID_NOT_FOUND") -> "Could not find the SystemUI UID"
             result.output.contains("UID_TEMP_FILE_FAILED") -> "Could not save the temporary UID file"
