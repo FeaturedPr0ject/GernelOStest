@@ -4,7 +4,7 @@ Root utility app with three tools:
 
 - **Kernel Panic** — checks for root permission, then runs the Linux SysRq crash command.
 - **Kill SystemUI** — checks for root permission, reads the SystemUI package UID, saves it to a temporary text file, then stops only processes whose UID and process name both match SystemUI.
-- **Reboot** — offers **Soft Reboot** (restarts Android userspace while keeping the Linux kernel running) and **Reboot (Hard Reboot)** (restarts the whole device, including the kernel). Both actions check for root permission and ask for confirmation first.
+- **Reboot** — checks for root permission, asks for confirmation, then runs a normal full-device reboot with `reboot`. This restarts Android userspace and the Linux kernel.
 
 ## Temporary UID file
 
@@ -16,7 +16,7 @@ Kernel Panic intentionally crashes the kernel and forces a reboot. Unsaved work 
 
 Kill SystemUI can make the status bar, navigation UI, and recent-app interface disappear briefly. Android may restart SystemUI automatically. The app deliberately matches the process name as well as the UID so it does not kill unrelated Android processes that may share the same UID.
 
-Soft Reboot support depends on the Android build. If the device does not support the userspace reboot command, the command may fail; the app does not guarantee that boot animation will appear. Hard Reboot restarts the device and is not a factory reset.
+Reboot performs a normal full-device restart. It is not a factory reset and does not erase user data.
 
 ## Build
 
