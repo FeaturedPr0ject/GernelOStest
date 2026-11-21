@@ -44,7 +44,9 @@ class MainActivity : ComponentActivity() {
                 RootPanicApp(
                     uidFile = uidFile,
                     onKernelPanic = { runRootAction(::triggerPanic) },
-                    onKillSystemUi = { runRootAction(::killSystemUi) }
+                    onKillSystemUi = { runRootAction(::killSystemUi) },
+                    onSoftReboot = { runRootAction { rebootDevice("userspace") } },
+                    onHardReboot = { runRootAction { rebootDevice("hard") } }
                 )
             }
         }
@@ -80,6 +82,19 @@ class MainActivity : ComponentActivity() {
         }
         val command = runRootCommand("echo c > /proc/sysrq-trigger")
         return if (command.exitCode == 0) "Panic command returned without crashing" else "Panic command failed: ${command.output}"
+    }
+
+    private fun rebootDevice(mode: String): String {
+        val rootCheck = runRootCommand("if [ \"\$(id -u)\" = \"0\" ]; then echo ROOT_OK; else echo NO_ROOT; fi")
+        if (!rootCheck.output.contains("ROOT_OK")) return "Root permission not granted"
+
+        val command = if (mode == "userspace") "reboot userspace" else "reboot"
+        val result = runRootCommand(command)
+        return if (result.exitCode == 0) {
+            if (mode == "userspace") "Soft reboot requested" else "Hard reboot requested"
+        } else {
+            "Reboot command failed: ${result.output.ifBlank { "exit code ${result.exitCode}" }}"
+        }
     }
 
     private fun killSystemUi(): String {
@@ -139,13 +154,17 @@ class MainActivity : ComponentActivity() {
 private fun RootPanicApp(
     uidFile: File,
     onKernelPanic: suspend () -> String,
-    onKillSystemUi: suspend () -> String
+    onKillSystemUi: suspend () -> String,
+    onSoftReboot: suspend () -> String,
+    onHardReboot: suspend () -> String
 ) {
     var selectedPage by remember { mutableStateOf("Kernel Panic") }
     var menuExpanded by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Ready") }
     var busy by remember { mutableStateOf(false) }
     var savedUid by remember { mutableStateOf(uidFile.takeIf { it.exists() }?.readText()?.trim().orEmpty()) }
+    var showSoftRebootConfirm by remember { mutableStateOf(false) }
+    var showHardRebootConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun perform(action: suspend () -> String) {
@@ -157,6 +176,40 @@ private fun RootPanicApp(
             savedUid = uidFile.takeIf { it.exists() }?.readText()?.trim().orEmpty()
             busy = false
         }
+    }
+
+    if (showSoftRebootConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSoftRebootConfirm = false },
+            title = { Text("Start Soft Reboot?") },
+            text = { Text("Android userspace will restart. The Linux kernel will keep running. Save your work first.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSoftRebootConfirm = false
+                    perform(onSoftReboot)
+                }) { Text("Restart") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSoftRebootConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showHardRebootConfirm) {
+        AlertDialog(
+            onDismissRequest = { showHardRebootConfirm = false },
+            title = { Text("Start Hard Reboot?") },
+            text = { Text("The whole device will restart. Save your work first.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showHardRebootConfirm = false
+                    perform(onHardReboot)
+                }) { Text("Reboot") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showHardRebootConfirm = false }) { Text("Cancel") }
+            }
+        )
     }
 
     Scaffold(
@@ -191,6 +244,14 @@ private fun RootPanicApp(
                                 text = { Text("Kill SystemUI") },
                                 onClick = {
                                     selectedPage = "Kill SystemUI"
+                                    status = "Ready"
+                                    menuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Reboot") },
+                                onClick = {
+                                    selectedPage = "Reboot"
                                     status = "Ready"
                                     menuExpanded = false
                                 }
@@ -230,6 +291,39 @@ private fun RootPanicApp(
                 Text(
                     "Warning: this immediately crashes the kernel and reboots the device. Unsaved data may be lost.",
                     color = Color(0xFFE6B9B9),
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            } else if (selectedPage == "Reboot") {
+                Text(
+                    "Choose how to restart Android. Both actions require root permission.",
+                    color = AppMuted,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp
+                )
+                Button(
+                    onClick = { showSoftRebootConfirm = true },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().height(58.dp)
+                ) {
+                    Text("Soft Reboot", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    "Restarts Android userspace while keeping the Linux kernel running. Boot animation behavior depends on the device.",
+                    color = AppMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+                OutlinedButton(
+                    onClick = { showHardRebootConfirm = true },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().height(54.dp)
+                ) {
+                    Text("Reboot (Hard Reboot)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Text(
+                    "Restarts the whole device, including the Linux kernel. This is not a factory reset and does not erase user data.",
+                    color = AppMuted,
                     fontSize = 13.sp,
                     lineHeight = 19.sp
                 )
