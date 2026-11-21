@@ -45,7 +45,8 @@ class MainActivity : ComponentActivity() {
                     uidFile = uidFile,
                     onKernelPanic = { runRootAction(::triggerPanic) },
                     onKillSystemUi = { runRootAction(::killSystemUi) },
-                    onReboot = { runRootAction(::rebootDevice) }
+                    onReboot = { runRootAction(::rebootDevice) },
+                    onLoadSystemLog = { runRootAction(::readSystemLog) }
                 )
             }
         }
@@ -81,6 +82,24 @@ class MainActivity : ComponentActivity() {
         }
         val command = runRootCommand("echo c > /proc/sysrq-trigger")
         return if (command.exitCode == 0) "Panic command returned without crashing" else "Panic command failed: ${command.output}"
+    }
+
+    private fun readSystemLog(): String {
+        val result = runRootCommand(
+            """
+                if [ "\$(id -u)" != "0" ]; then
+                    echo ROOT_PANIC_NO_ROOT
+                    exit 10
+                fi
+                logcat -b all -d -v threadtime -t 1500 2>&1
+            """.trimIndent()
+        )
+        return when {
+            result.output.contains("ROOT_PANIC_NO_ROOT") -> "Root permission not granted"
+            result.exitCode != 0 -> "Could not read system log: ${result.output.ifBlank { "exit code ${result.exitCode}" }}"
+            result.output.isBlank() -> "No log entries are currently available."
+            else -> result.output
+        }
     }
 
     private fun rebootDevice(): String {
@@ -153,13 +172,15 @@ private fun RootPanicApp(
     uidFile: File,
     onKernelPanic: suspend () -> String,
     onKillSystemUi: suspend () -> String,
-    onReboot: suspend () -> String
+    onReboot: suspend () -> String,
+    onLoadSystemLog: suspend () -> String
 ) {
     var selectedPage by remember { mutableStateOf("Kernel Panic") }
     var menuExpanded by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Ready") }
     var busy by remember { mutableStateOf(false) }
     var savedUid by remember { mutableStateOf(uidFile.takeIf { it.exists() }?.readText()?.trim().orEmpty()) }
+    var systemLog by remember { mutableStateOf("Open System Log to load the latest available Android logs.") }
     var showRebootConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -168,7 +189,13 @@ private fun RootPanicApp(
         busy = true
         status = "Requesting root access…"
         scope.launch {
-            status = action()
+            val result = action()
+            if (selectedPage == "System Log") {
+                systemLog = result
+                status = if (result.startsWith("Root permission") || result.startsWith("Could not read")) "System log unavailable" else "System log loaded"
+            } else {
+                status = result
+            }
             savedUid = uidFile.takeIf { it.exists() }?.readText()?.trim().orEmpty()
             busy = false
         }
@@ -235,6 +262,15 @@ private fun RootPanicApp(
                                     menuExpanded = false
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text("System Log") },
+                                onClick = {
+                                    selectedPage = "System Log"
+                                    status = "Loading system log…"
+                                    menuExpanded = false
+                                    perform(onLoadSystemLog)
+                                }
+                            )
                         }
                     }
                 },
@@ -292,6 +328,39 @@ private fun RootPanicApp(
                     color = AppMuted,
                     fontSize = 13.sp,
                     lineHeight = 19.sp
+                )
+            } else if (selectedPage == "System Log") {
+                Text(
+                    "Latest entries from Android log buffers. Refresh to read the newest entries.",
+                    color = AppMuted,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp
+                )
+                Button(
+                    onClick = { perform(onLoadSystemLog) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Text("Refresh System Log", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = AppSurface),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        systemLog,
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        color = AppText,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
+                Text(
+                    "Android log buffers are limited in size. Older entries may be overwritten, so this view shows the entries still retained by the system since boot, up to the latest 1,500 lines. Refresh does not recover logs that have already been overwritten.",
+                    color = AppMuted,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp
                 )
             } else {
                 Text(
