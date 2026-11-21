@@ -1,10 +1,15 @@
 # Root Panic
 
-Root utility app with three tools:
+Root utility app with four tools:
 
 - **Kernel Panic** — checks for root permission, then runs the Linux SysRq crash command.
 - **Kill SystemUI** — checks for root permission, reads the SystemUI package UID, saves it to a temporary text file, then stops only processes whose UID and process name both match SystemUI.
 - **Reboot** — checks for root permission, asks for confirmation, then runs a normal full-device reboot with `reboot`. This restarts Android userspace and the Linux kernel.
+- **System Log** — checks for root permission and displays up to the latest 1,500 retained lines from all Android logcat buffers. Use Refresh System Log to load the latest available entries.
+
+## System Log limitations
+
+Android logcat uses limited-size ring buffers. Older messages can be overwritten as the device continues running. The viewer can show entries still retained by the system, but cannot guarantee that every event since boot is still available or recover overwritten messages.
 
 ## Temporary UID file
 
