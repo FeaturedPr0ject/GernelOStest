@@ -9,26 +9,89 @@ on:
       - ".github/workflows/android-panic.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+
+      - name: Prepare stable signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ROOT_PANIC_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ROOT_PANIC_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ROOT_PANIC_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ROOT_PANIC_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            KEYSTORE_PATH="$RUNNER_TEMP/root-panic-upload.jks"
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            test -s "$KEYSTORE_PATH"
+            {
+              echo "ROOT_PANIC_KEYSTORE_PATH=$KEYSTORE_PATH"
+              echo "ROOT_PANIC_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "ROOT_PANIC_KEY_ALIAS=$KEY_ALIAS"
+              echo "ROOT_PANIC_KEY_PASSWORD=$KEY_PASSWORD"
+              echo "ROOT_PANIC_STABLE_SIGNING=true"
+            } >> "$GITHUB_ENV"
+            echo "Stable app signing is enabled."
+          else
+            echo "ROOT_PANIC_STABLE_SIGNING=false" >> "$GITHUB_ENV"
+            echo "::warning::Stable signing secrets are not configured. This APK uses the runner debug key and cannot be relied on for in-place updates from future workflow runs."
+          fi
+
       - name: Build debug APK
-        run: gradle -p android-panic :app:assembleDebug
-      - name: Upload APK
+        run: gradle -p android-panic clean :app:assembleDebug
+
+      - name: Build stable release APK
+        if: env.ROOT_PANIC_STABLE_SIGNING == 'true'
+        run: gradle -p android-panic :app:assembleRelease
+
+      - name: Verify APK outputs
+        shell: bash
+        run: |
+          test -s android-panic/app/build/outputs/apk/debug/app-debug.apk
+          if [ "$ROOT_PANIC_STABLE_SIGNING" = "true" ]; then
+            test -s android-panic/app/build/outputs/apk/release/app-release.apk
+          fi
+          echo "APK output verification passed."
+
+      - name: Write build summary
+        shell: bash
+        run: |
+          {
+            echo "## Root Panic build"
+            echo "- Version: 1.1 (code 2)"
+            if [ "$ROOT_PANIC_STABLE_SIGNING" = "true" ]; then
+              echo "- Signature: stable upload key"
+              echo "- Update install: supported over previous APKs signed with this same key"
+            else
+              echo "- Signature: temporary GitHub runner debug key"
+              echo "- Configure the four ROOT_PANIC_KEYSTORE_* repository secrets for stable in-place updates"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Root-Panic-debug
-          path: android-panic/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: Root-Panic-APKs
+          path: |
+            android-panic/app/build/outputs/apk/debug/app-debug.apk
+            android-panic/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
+          retention-days: 14
