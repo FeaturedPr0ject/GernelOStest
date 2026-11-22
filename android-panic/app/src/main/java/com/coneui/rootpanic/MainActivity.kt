@@ -803,70 +803,69 @@ private fun RootPanicApp(
             }
         }
         if (drawerOpen) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = AppBackground
-            ) {
-                Column(
-                    modifier = Modifier
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 22.dp, vertical = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .clickable { drawerOpen = false }
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("ROOT PANIC", fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = AppText)
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = { drawerOpen = false }) { Text("CLOSE") }
-                    }
-                    Text("Choose a screen", color = AppMuted, fontSize = 13.sp)
-                    HorizontalDivider(color = AppSurfaceAlt)
-                    val destinations = listOf(
-                        Triple("Welcome", "⌂", "App home"),
-                        Triple("Kernel Panic", "⚡", "Kernel diagnostics and panic"),
-                        Triple("Kill SystemUI", "▣", "Stop Android SystemUI"),
-                        Triple("System Log", "≋", "Live warning and error log")
-                    )
-                    destinations.forEach { (page, symbol, description) ->
-                        Surface(
-                            color = if (selectedPage == page) AppSurfaceAlt else AppSurface,
-                            shape = MaterialTheme.shapes.large,
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                selectedPage = page
-                                drawerOpen = false
-                            }
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 19.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    Surface(color = Color.Black.copy(alpha = 0.62f), modifier = Modifier.fillMaxSize()) {}
+                }
+                Surface(
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth(0.56f),
+                    color = AppBackground,
+                    shadowElevation = 20.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp, vertical = 22.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("ROOT PANIC", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = AppText)
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { drawerOpen = false }) { Text("✕") }
+                        }
+                        Text("Choose a screen", color = AppMuted, fontSize = 12.sp)
+                        HorizontalDivider(color = AppSurfaceAlt)
+                        val destinations = listOf(
+                            Triple("Welcome", "⌂", "App home"),
+                            Triple("Kernel Panic", "⚡", "Kernel diagnostics"),
+                            Triple("Kill SystemUI", "▣", "Restart SystemUI"),
+                            Triple("System Log", "≋", "Live system warnings")
+                        )
+                        destinations.forEach { (page, symbol, description) ->
+                            Surface(
+                                color = if (selectedPage == page) AppSurfaceAlt else AppSurface,
+                                shape = MaterialTheme.shapes.large,
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    selectedPage = page
+                                    drawerOpen = false
+                                }
                             ) {
-                                Text(symbol, fontSize = 25.sp, color = AppPrimary)
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(page, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppText)
-                                    Text(description, fontSize = 12.sp, color = AppMuted)
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 13.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("$symbol  $page", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AppText)
+                                    Text(description, fontSize = 10.sp, color = AppMuted)
                                 }
                             }
                         }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Surface(
-                        color = if (selectedPage == "Settings") AppSurfaceAlt else AppSurface,
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            selectedPage = "Settings"
-                            drawerOpen = false
-                        }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(18.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Spacer(Modifier.weight(1f))
+                        Surface(
+                            color = if (selectedPage == "Settings") AppSurfaceAlt else AppSurface,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedPage = "Settings"
+                                drawerOpen = false
+                            }
                         ) {
-                            Text("⚙", fontSize = 23.sp, color = AppPrimary)
-                            Spacer(Modifier.width(16.dp))
-                            Text("Settings", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text("⚙  Settings", modifier = Modifier.padding(15.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         }
+                        Text("v" + BuildConfig.VERSION_NAME, color = AppMuted, fontSize = 10.sp)
                     }
-                    Text("Root Panic • " + BuildConfig.VERSION_NAME, color = AppMuted, fontSize = 11.sp)
                 }
             }
         }
