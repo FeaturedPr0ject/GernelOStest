@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                     onCheckRoot = { runRootAccessCheck() },
                     onRequestShizuku = { requestShizukuPermission() },
                     onRefreshShizuku = { refreshShizukuStatus() },
-                    onCheckUpdates = { withContext(Dispatchers.IO) { ReleaseUpdater.check(this@MainActivity) } },
+                    onCheckUpdates = { withContext(Dispatchers.IO) { ReleaseUpdater.check() } },
                     onInstallUpdate = { update -> withContext(Dispatchers.IO) { ReleaseUpdater.downloadAndInstall(this@MainActivity, update, shizukuConnected, shizukuPermissionGranted) } },
                     onOpenGithub = { openUrl("https://github.com/FeaturedPr0ject") },
                     onOpenShizuku = { openUrl("https://shizuku.rikka.app/download/") }
