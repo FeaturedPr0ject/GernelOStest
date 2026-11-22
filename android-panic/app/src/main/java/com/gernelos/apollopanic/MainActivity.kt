@@ -28,7 +28,7 @@ private val AppOnPrimary = Color(0xFF182D60)
 private val AppText = Color(0xFFE1E5F0)
 private val AppMuted = Color(0xFFAEB6C5)
 
-private object SystemLogCapture {
+internal object SystemLogCapture {
     private const val LOG_FILE = "system-log.txt"
     private const val PID_FILE = "system-log.pid"
     private const val MAX_BYTES = 24576
