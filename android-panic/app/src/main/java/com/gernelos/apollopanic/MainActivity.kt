@@ -1,6 +1,7 @@
 package com.gernelos.apollopanic
 
 import android.os.Bundle
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,69 @@ private val AppPrimary = Color(0xFFB8C7FF)
 private val AppOnPrimary = Color(0xFF182D60)
 private val AppText = Color(0xFFE1E5F0)
 private val AppMuted = Color(0xFFAEB6C5)
+
+private object SystemLogCapture {
+    private const val LOG_FILE = "system-log.txt"
+    private const val PID_FILE = "system-log.pid"
+    private const val MAX_BYTES = 24576
+
+    fun start(context: Context): String {
+        val logPath = File(context.filesDir, LOG_FILE).absolutePath
+        val pidPath = File(context.filesDir, PID_FILE).absolutePath
+        val script = """
+            if [ "$(id -u)" != "0" ]; then
+                echo ROOT_PANIC_NO_ROOT
+                exit 10
+            fi
+            if [ -s '$pidPath' ]; then
+                old_pid=$(cat '$pidPath' 2>/dev/null)
+                if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+                    echo LOG_CAPTURE_RUNNING
+                    exit 0
+                fi
+            fi
+            rm -f '$pidPath'
+            logcat -b main -b system -b crash -v threadtime -f '$logPath' -r 128 -n 2 '*:W' >/dev/null 2>&1 &
+            echo $! > '$pidPath'
+            sleep 1
+            current_pid=$(cat '$pidPath' 2>/dev/null)
+            if [ -n "$current_pid" ] && kill -0 "$current_pid" 2>/dev/null; then
+                chmod 644 '$logPath' 2>/dev/null
+                echo LOG_CAPTURE_STARTED
+            else
+                rm -f '$pidPath'
+                echo LOG_CAPTURE_FAILED
+                exit 11
+            fi
+        """.trimIndent()
+        return runRoot(script)
+    }
+
+    fun load(context: Context): String {
+        val startResult = start(context)
+        if (startResult.contains("ROOT_PANIC_NO_ROOT")) return "Root permission not granted"
+        if (!startResult.contains("LOG_CAPTURE_STARTED") && !startResult.contains("LOG_CAPTURE_RUNNING")) {
+            return "Could not start system log capture: " + startResult.ifBlank { "unknown error" }
+        }
+        val logPath = File(context.filesDir, LOG_FILE).absolutePath
+        val result = runRoot("if [ -f '$logPath' ]; then tail -n 160 '$logPath' | tail -c $MAX_BYTES; else echo 'Waiting for Android log entries'; fi")
+        return when {
+            result.contains("ROOT_PANIC_NO_ROOT") -> "Root permission not granted"
+            result.isBlank() -> "No warning or error entries are available yet."
+            else -> result
+        }
+    }
+
+    private fun runRoot(command: String): String = try {
+        val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        val exitCode = process.waitFor()
+        if (exitCode == 0) output else output.ifBlank { "Root command failed with exit code $exitCode" }
+    } catch (error: Exception) {
+        error.message ?: "su unavailable"
+    }
+}
+
 
 class MainActivity : ComponentActivity() {
     private val uidFile: File by lazy { File(filesDir, "systemui_uid.tmp") }
@@ -84,22 +149,7 @@ class MainActivity : ComponentActivity() {
         return if (command.exitCode == 0) "Panic command returned without crashing" else "Panic command failed: ${command.output}"
     }
 
-    private fun readSystemLog(): String {
-        val script = """
-            if [ "$(id -u)" != "0" ]; then
-                echo ROOT_PANIC_NO_ROOT
-                exit 10
-            fi
-            logcat -b all -d -v threadtime -t 1500 2>&1
-        """.trimIndent()
-        val result = runRootCommand(script)
-        return when {
-            result.output.contains("ROOT_PANIC_NO_ROOT") -> "Root permission not granted"
-            result.exitCode != 0 -> "Could not read system log: ${result.output.ifBlank { "exit code ${result.exitCode}" }}"
-            result.output.isBlank() -> "No log entries are currently available."
-            else -> result.output
-        }
-    }
+    private fun readSystemLog(): String = SystemLogCapture.load(this)
 
     private fun rebootDevice(): String {
         val rootCheck = runRootCommand("if [ \"\$(id -u)\" = \"0\" ]; then echo ROOT_OK; else echo NO_ROOT; fi")
@@ -330,7 +380,7 @@ private fun RootPanicApp(
                 )
             } else if (selectedPage == "System Log") {
                 Text(
-                    "Latest entries from Android log buffers. Refresh to read the newest entries.",
+                    "Root captures Android warnings and errors after boot. Only a small, rotating log is kept.",
                     color = AppMuted,
                     fontSize = 14.sp,
                     lineHeight = 21.sp
@@ -352,11 +402,13 @@ private fun RootPanicApp(
                         color = AppText,
                         fontSize = 10.sp,
                         lineHeight = 14.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        maxLines = 160,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Text(
-                    "Android log buffers are limited in size. Older entries may be overwritten, so this view shows the entries still retained by the system since boot, up to the latest 1,500 lines. Refresh does not recover logs that have already been overwritten.",
+                    "Captures warning/error logs from main, system, and crash buffers. The background log is limited to about 384 KB with rotation; this screen displays at most 160 lines and 24 KB.",
                     color = AppMuted,
                     fontSize = 12.sp,
                     lineHeight = 18.sp
