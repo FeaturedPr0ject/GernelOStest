@@ -1,5 +1,8 @@
 # Root Panic
 
+- **Application ID / namespace:** `com.coneui.rootpanic`
+- **Current app version:** 1.2 (version code 3)
+
 Root utility app for Android 10+ with a compact dark Compose interface.
 
 ## Screens

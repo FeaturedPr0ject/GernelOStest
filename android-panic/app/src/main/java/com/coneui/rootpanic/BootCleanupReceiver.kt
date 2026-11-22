@@ -1,4 +1,4 @@
-package com.gernelos.apollopanic
+package com.coneui.rootpanic
 
 import android.content.BroadcastReceiver
 import android.content.Context

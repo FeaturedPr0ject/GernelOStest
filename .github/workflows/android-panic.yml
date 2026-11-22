@@ -76,7 +76,7 @@ jobs:
         run: |
           {
             echo "## Root Panic build"
-            echo "- Version: 1.1 (code 2)"
+            echo "- Version: 1.2 (code 3)"
             if [ "$ROOT_PANIC_STABLE_SIGNING" = "true" ]; then
               echo "- Signature: stable upload key"
               echo "- Update install: supported over previous APKs signed with this same key"

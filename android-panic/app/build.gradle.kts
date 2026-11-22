@@ -7,15 +7,15 @@ plugins {
 val stableKeystorePath = System.getenv("ROOT_PANIC_KEYSTORE_PATH")
 
 android {
-    namespace = "com.gernelos.apollopanic"
+    namespace = "com.coneui.rootpanic"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.gernelos.apollopanic"
+        applicationId = "com.coneui.rootpanic"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     buildFeatures {

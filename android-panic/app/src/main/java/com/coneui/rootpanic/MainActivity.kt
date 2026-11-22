@@ -1,4 +1,4 @@
-package com.gernelos.apollopanic
+package com.coneui.rootpanic
 
 import android.content.Context
 import android.content.Intent
