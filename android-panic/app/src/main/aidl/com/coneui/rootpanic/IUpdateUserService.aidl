@@ -4,5 +4,5 @@ import android.os.ParcelFileDescriptor;
 
 interface IUpdateUserService {
     void destroy() = 16777114;
-    String installApk(in ParcelFileDescriptor apkFd, long size);
+    String installApk(in ParcelFileDescriptor apkFd, long size) = 1;
 }
