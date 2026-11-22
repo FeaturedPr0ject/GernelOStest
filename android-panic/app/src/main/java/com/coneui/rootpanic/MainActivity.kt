@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
-import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -156,7 +155,8 @@ class MainActivity : ComponentActivity() {
                     onCheckRoot = { runRootAccessCheck() },
                     onRequestShizuku = { requestShizukuPermission() },
                     onRefreshShizuku = { refreshShizukuStatus() },
-                    onCheckUpdates = { runRootAction(::checkLatestRelease) },
+                    onCheckUpdates = { withContext(Dispatchers.IO) { ReleaseUpdater.check(this@MainActivity) } },
+                    onInstallUpdate = { update -> withContext(Dispatchers.IO) { ReleaseUpdater.downloadAndInstall(this@MainActivity, update, shizukuConnected, shizukuPermissionGranted) } },
                     onOpenGithub = { openUrl("https://github.com/FeaturedPr0ject") },
                     onOpenShizuku = { openUrl("https://shizuku.rikka.app/download/") }
                 )
@@ -380,40 +380,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkLatestRelease(): String {
-        var connection: HttpURLConnection? = null
-        return try {
-            val activeConnection = (URL(GITHUB_RELEASES_API).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 6000
-                readTimeout = 6000
-                setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-                setRequestProperty("User-Agent", "Root-Panic-Android")
-            }
-            connection = activeConnection
-            when (activeConnection.responseCode) {
-                404 -> "No official GitHub release has been published yet. Check the repository for builds."
-                in 200..299 -> {
-                    val json = JSONObject(activeConnection.inputStream.bufferedReader().use { it.readText() })
-                    val latest = json.optString("tag_name", "unknown")
-                    val latestUrl = json.optString("html_url", GITHUB_REPOSITORY)
-                    val current = BuildConfig.VERSION_NAME.removePrefix("v")
-                    val latestComparable = latest.removePrefix("v")
-                    if (latestComparable == current) {
-                        "You are using the latest release ($latest)."
-                    } else {
-                        "Latest release: $latest • installed: " + BuildConfig.VERSION_NAME + "\n" + latestUrl
-                    }
-                }
-                else -> "Update check failed with HTTP " + activeConnection.responseCode + "."
-            }
-        } catch (error: Exception) {
-            "Cannot check updates: " + (error.message ?: "network unavailable")
-        } finally {
-            connection?.disconnect()
-        }
-    }
+    private fun checkLatestRelease(): UpdateCheckResult = ReleaseUpdater.check(this)
 
     private fun runRootCommand(command: String): RootResult = try {
         val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
@@ -445,7 +412,8 @@ private fun RootPanicApp(
     onCheckRoot: suspend () -> RootAccess,
     onRequestShizuku: () -> String,
     onRefreshShizuku: () -> Unit,
-    onCheckUpdates: suspend () -> String,
+    onCheckUpdates: suspend () -> UpdateCheckResult,
+    onInstallUpdate: suspend (UpdateInfo) -> String,
     onOpenGithub: () -> Unit,
     onOpenShizuku: () -> Unit
 ) {
@@ -459,9 +427,8 @@ private fun RootPanicApp(
     var showPanicConfirm by remember { mutableStateOf(false) }
     var drawerOpen by remember { mutableStateOf(false) }
     var rootAccess by remember { mutableStateOf(RootAccess(false, "Checking…", "Root status has not been checked yet.")) }
-    var updateStatus by remember { mutableStateOf("Tap the version label five times to check for updates.") }
-    var versionTapCount by remember { mutableIntStateOf(0) }
-    var lastVersionTap by remember { mutableLongStateOf(0L) }
+    var updateStatus by remember { mutableStateOf("Checking for updates…") }
+    var availableUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
     val scope = rememberCoroutineScope()
 
     fun <T> perform(action: suspend () -> T, onResult: (T) -> Unit = { result -> status = result.toString() }) {
