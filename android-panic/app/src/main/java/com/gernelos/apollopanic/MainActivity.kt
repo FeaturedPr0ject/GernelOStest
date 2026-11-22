@@ -238,15 +238,21 @@ private fun RootPanicApp(
         busy = true
         status = "Requesting root access…"
         scope.launch {
-            val result = action()
-            if (selectedPage == "System Log") {
-                systemLog = result
-                status = if (result.startsWith("Root permission") || result.startsWith("Could not read")) "System log unavailable" else "System log loaded"
-            } else {
-                status = result
+            try {
+                val result = action()
+                if (selectedPage == "System Log") {
+                    systemLog = result
+                    status = if (result.startsWith("Root permission") || result.startsWith("Could not")) "System log unavailable" else "System log loaded"
+                } else {
+                    status = result
+                }
+                savedUid = runCatching { uidFile.takeIf { it.exists() }?.readText()?.trim().orEmpty() }.getOrDefault("")
+            } catch (error: Exception) {
+                status = error.message ?: "Action failed"
+                if (selectedPage == "System Log") systemLog = status
+            } finally {
+                busy = false
             }
-            savedUid = uidFile.takeIf { it.exists() }?.readText()?.trim().orEmpty()
-            busy = false
         }
     }
 
