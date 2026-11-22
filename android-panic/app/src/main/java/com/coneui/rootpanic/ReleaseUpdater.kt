@@ -1,6 +1,10 @@
 package com.coneui.rootpanic
 
 import android.content.Context
+import android.content.ComponentName
+import android.content.ServiceConnection
+import android.os.IBinder
+import android.os.ParcelFileDescriptor
 import android.content.pm.PackageManager
 import org.json.JSONObject
 import rikka.shizuku.Shizuku
@@ -8,6 +12,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 internal data class UpdateInfo(
@@ -148,14 +153,8 @@ internal object ReleaseUpdater {
         if (rootResult.contains("Success", true)) return "Update installed successfully through Root. Reopen Root Panic."
 
         if (shizukuConnected && shizukuPermissionGranted) {
-            val shizukuResult = runCatching {
-                val process = Shizuku.newProcess(
-                    arrayOf("sh", "-c", "pm install -r -S " + size),
-                    null,
-                    null
-                )
-                installFromProcess(process, apk)
-            }.getOrElse { "Shizuku install unavailable: " + it.message }
+            val shizukuResult = runCatching { installWithShizuku(context, apk) }
+                .getOrElse { "Shizuku install unavailable: " + it.message }
             if (shizukuResult.contains("Success", true)) return "Update installed successfully through Shizuku. Reopen Root Panic."
             return "Root install failed: " + rootResult + "\nShizuku install failed: " + shizukuResult +
                 "\nThe downloaded APK remains in the app cache."
@@ -190,6 +189,42 @@ internal object ReleaseUpdater {
             null
         } catch (error: Exception) {
             "Could not verify the APK: " + (error.message ?: "verification failed")
+        }
+    }
+
+    private fun installWithShizuku(context: Context, apk: File): String {
+        if (!Shizuku.pingBinder() || Shizuku.isPreV11() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            return "Shizuku service or permission is unavailable."
+        }
+        if (Shizuku.getVersion() < 10) return "Shizuku API 10 or newer is required."
+        val args = Shizuku.UserServiceArgs(
+            ComponentName(context.packageName, UpdateUserService::class.java.name)
+        ).daemon(false)
+            .processNameSuffix("installer")
+            .debuggable(BuildConfig.DEBUG)
+            .version(BuildConfig.VERSION_CODE)
+        val connected = CountDownLatch(1)
+        var remote: IUpdateUserService? = null
+        val serviceConnection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                remote = IUpdateUserService.Stub.asInterface(service)
+                connected.countDown()
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {
+                remote = null
+                connected.countDown()
+            }
+        }
+        try {
+            Shizuku.bindUserService(args, serviceConnection)
+            if (!connected.await(30, TimeUnit.SECONDS)) return "Timed out while starting the Shizuku installer service."
+            val service = remote ?: return "Shizuku installer service disconnected."
+            ParcelFileDescriptor.open(apk, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                return service.installApk(descriptor, apk.length())
+            }
+        } finally {
+            runCatching { Shizuku.unbindUserService(args, serviceConnection, true) }
         }
     }
 

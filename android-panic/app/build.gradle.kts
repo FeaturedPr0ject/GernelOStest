@@ -21,6 +21,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     if (!stableKeystorePath.isNullOrBlank()) {
