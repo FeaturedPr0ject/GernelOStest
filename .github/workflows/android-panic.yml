@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
@@ -113,12 +114,44 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Publish GitHub Release
+      - name: Collect previous APK builds
+        if: ${{ inputs.publish_release == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mkdir -p legacy/v1.0 legacy/v1.1 legacy/v1.2
+          gh run download 44920806602 --repo "$GITHUB_REPOSITORY" --name Root-Panic-debug --dir legacy/v1.0
+          gh run download 44987827540 --repo "$GITHUB_REPOSITORY" --name Root-Panic-APKs --dir legacy/v1.1
+          gh run download 45010540617 --repo "$GITHUB_REPOSITORY" --name Root-Panic-APKs --dir legacy/v1.2
+          cp legacy/v1.0/app-debug.apk Root-Panic-v1.0-legacy.apk
+          cp legacy/v1.1/debug/app-debug.apk Root-Panic-v1.1-legacy.apk
+          cp legacy/v1.2/debug/app-debug.apk Root-Panic-v1.2-legacy.apk
+
+      - name: Publish versioned GitHub Releases
         if: ${{ inputs.publish_release == true && env.ROOT_PANIC_STABLE_SIGNING == 'true' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.3
-          name: Root Panic v1.3
-          body_path: android-panic/RELEASE_NOTES.md
-          files: Root-Panic-v1.3.apk
-          fail_on_unmatched_files: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          publish_release() {
+            tag="$1"
+            asset="$2"
+            title="$3"
+            target="$4"
+            notes="$5"
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+            else
+              gh release create "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes" --target "$target"
+            fi
+          }
+
+          publish_release v1.0 Root-Panic-v1.0-legacy.apk "Root Panic v1.0 (Legacy)" aaae0089e342f720dfe852053a5bf6b613530d2f "Archived Debug APK. Package ID: com.gernelos.apollopanic. Temporary runner signing; not suitable for in-place updates."
+          publish_release v1.1 Root-Panic-v1.1-legacy.apk "Root Panic v1.1 (Legacy)" 7966b730ca5a76448405b3ad718a6d7039e84f46 "Archived Debug APK. Package ID: com.gernelos.apollopanic. Temporary runner signing; not suitable for in-place updates."
+          publish_release v1.2 Root-Panic-v1.2-legacy.apk "Root Panic v1.2 (Legacy)" ddc343fff6dcf663f00a1ffc8fd482f52ac3c7e2 "Archived Debug APK. Package ID: com.coneui.rootpanic. Temporary runner signing; a clean install is required before moving to the stable-signed release."
+          if gh release view v1.3 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v1.3 Root-Panic-v1.3.apk --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create v1.3 Root-Panic-v1.3.apk --repo "$GITHUB_REPOSITORY" --title "Root Panic v1.3" --notes-file android-panic/RELEASE_NOTES.md --target "$GITHUB_SHA"
+          fi

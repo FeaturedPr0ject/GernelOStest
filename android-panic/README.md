@@ -46,7 +46,7 @@ In GitHub, open **Settings → Secrets and variables → Actions** and add these
 
 After these secrets are configured, the workflow signs debug and release APKs with that same keystore. Install the stable-key APK once; future builds signed by the same key can update it without uninstalling. To publish a GitHub Release, manually run the workflow and enable `publish_release`. An APK already installed with a different debug certificate must be replaced once before this stable update path can be used.
 
-When the secrets are absent, Actions still builds a debug APK so the source can be tested, but the runner-generated debug signature is not suitable for reliable in-place updates.
+When the secrets are absent, Actions still builds a debug APK so the source can be tested, but the runner-generated debug signature is not suitable for reliable in-place updates. The manual release workflow archives the previous v1.0, v1.1, and v1.2 Debug APKs as legacy downloads, then publishes the stable-signed v1.3 APK as the current update track.
 
 ## Temporary UID file
 

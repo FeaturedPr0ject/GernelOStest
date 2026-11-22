@@ -60,10 +60,11 @@ internal object ReleaseUpdater {
                     val name = asset.optString("name", "")
                     val url = asset.optString("browser_download_url", "")
                     if (name.endsWith(".apk", true) && url.startsWith("https://")) {
-                        if (name.startsWith("Root-Panic", true)) {
+                        if (name.equals("Root-Panic-" + tag + ".apk", true)) {
                             selected = asset
                             break
                         }
+                        if (name.startsWith("Root-Panic", true) && selected == null) selected = asset
                         if (selected == null) selected = asset
                     }
                 }
