@@ -49,6 +49,9 @@ internal object ReleaseUpdater {
             val json = JSONObject(active.inputStream.bufferedReader().use { it.readText() })
             val tag = json.optString("tag_name", "").trim()
             if (tag.isBlank()) return UpdateCheckResult(null, "The latest release has no version tag.")
+            if (!Regex("^v?\\d+(\\.\\d+)*$").matches(tag)) {
+                return UpdateCheckResult(null, "No versioned Root Panic release has been published yet.")
+            }
             if (compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) {
                 return UpdateCheckResult(null, "Root Panic is up to date (" + BuildConfig.VERSION_NAME + ").")
             }
