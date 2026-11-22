@@ -5,11 +5,13 @@ Root utility app with four tools:
 - **Kernel Panic** — checks for root permission, then runs the Linux SysRq crash command.
 - **Kill SystemUI** — checks for root permission, reads the SystemUI package UID, saves it to a temporary text file, then stops only processes whose UID and process name both match SystemUI.
 - **Reboot** — checks for root permission, asks for confirmation, then runs a normal full-device reboot with `reboot`. This restarts Android userspace and the Linux kernel.
-- **System Log** — checks for root permission and displays up to the latest 1,500 retained lines from all Android logcat buffers. Use Refresh System Log to load the latest available entries.
+- **System Log** — starts a root logcat capture after `BOOT_COMPLETED`, filters to warnings and errors from the main, system, and crash buffers, and displays a small recent tail. Refresh also starts capture if it is not already running.
 
-## System Log limitations
+## System Log limits
 
-Android logcat uses limited-size ring buffers. Older messages can be overwritten as the device continues running. The viewer can show entries still retained by the system, but cannot guarantee that every event since boot is still available or recover overwritten messages.
+The boot receiver starts root logcat capture after Android sends `BOOT_COMPLETED`, when user storage is available. The capture includes warning/error messages only (`*:W`) from the main, system, and crash buffers. Logcat rotates at 128 KB with two rotated files (approximately 384 KB maximum). The viewer reads at most the latest 160 lines and 24 KB, reducing memory use on low-RAM devices.
+
+Automatic capture requires the app to have been launched once and root permission to have been granted to it. If root was not previously authorized, open System Log and press Refresh after granting root. Capture starts after boot completion, not during the earliest kernel/init stages.
 
 ## Temporary UID file
 
