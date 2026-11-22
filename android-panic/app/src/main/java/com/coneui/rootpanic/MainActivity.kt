@@ -30,11 +30,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import rikka.shizuku.Shizuku
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 private val AppBackground = Color(0xFF101318)
 private val AppSurface = Color(0xFF1B2028)
@@ -45,7 +42,6 @@ private val AppText = Color(0xFFE1E5F0)
 private val AppMuted = Color(0xFFAEB6C5)
 private val AppWarning = Color(0xFFFFC7A8)
 private const val GITHUB_REPOSITORY = "https://github.com/FeaturedPr0ject/GernelOStest"
-private const val GITHUB_RELEASES_API = "https://api.github.com/repos/FeaturedPr0ject/GernelOStest/releases/latest"
 private const val SHIZUKU_REQUEST_CODE = 7301
 
 internal object SystemLogCapture {
@@ -379,8 +375,6 @@ class MainActivity : ComponentActivity() {
             else -> "SystemUI action failed: " + result.output.ifBlank { "unknown error" }
         }
     }
-
-    private fun checkLatestRelease(): UpdateCheckResult = ReleaseUpdater.check(this)
 
     private fun runRootCommand(command: String): RootResult = try {
         val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()

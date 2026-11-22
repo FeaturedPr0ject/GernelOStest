@@ -1,7 +1,7 @@
 # Root Panic
 
 - **Application ID / namespace:** `com.coneui.rootpanic`
-- **Current app version:** 1.2 (version code 3)
+- **Current app version:** 1.3 (version code 4)
 
 Root utility app for Android 10+ with a compact dark Compose interface.
 
@@ -11,13 +11,13 @@ Root utility app for Android 10+ with a compact dark Compose interface.
 - **Kernel Panic** — checks Root, Android build details, kernel version, SysRq support, trigger writability, memory and SELinux state. A confirmation dialog appears before the intentional kernel crash.
 - **Kill SystemUI** — checks Root, reads the SystemUI package UID, saves it temporarily, then stops only processes whose UID and process name both match SystemUI.
 - **System Log** — starts a root logcat capture after `BOOT_COMPLETED`, filters warnings and errors from the main, system, and crash buffers, and refreshes the viewer automatically about every 400 ms. There is no manual refresh button.
-- **Settings** — checks Root and identifies a known provider (Magisk, KernelSU, or APatch). Shizuku/Sui is checked independently using the official Shizuku API and permission request flow. The version footer supports a five-tap latest-release check.
+- **Settings** — checks Root and identifies a known provider (Magisk, KernelSU, or APatch). Shizuku/Sui is checked independently using the official Shizuku API and permission request flow. The app checks GitHub Releases automatically on launch and shows an update banner when a newer APK is published. The user must approve the update before download and installation.
 
 ## System Log limits
 
 The boot receiver starts root logcat capture after Android sends `BOOT_COMPLETED`, when user storage is available. The capture includes warning/error messages only (`*:W`) from the main, system, and crash buffers. Logcat rotates at 128 KB with two rotated files (approximately 384 KB maximum). The viewer reads at most the latest 160 lines and 24 KB, reducing memory use on low-RAM devices.
 
-The viewer polls the app-private log file every 400 ms. The root logcat process writes continuously in the background. Automatic capture requires the app to have been launched once and Root permission to have been granted to it. If Root was not previously authorized, open the app and approve Root access. Capture starts after boot completion, not during the earliest kernel/init stages.
+The navigation drawer opens from the left and occupies about 56% of the screen width. The app checks GitHub Releases automatically when opened and shows an update banner when a newer version is available. The viewer polls the app-private log file every 400 ms. The root logcat process writes continuously in the background. Automatic capture requires the app to have been launched once and Root permission to have been granted to it. If Root was not previously authorized, open the app and approve Root access. Capture starts after boot completion, not during the earliest kernel/init stages.
 
 ## Shizuku / Sui
 
@@ -44,7 +44,7 @@ In GitHub, open **Settings → Secrets and variables → Actions** and add these
 - `ROOT_PANIC_KEY_ALIAS` — `rootpanic` (or the alias chosen above).
 - `ROOT_PANIC_KEY_PASSWORD` — the key password.
 
-After these secrets are configured, the workflow signs both debug and release APKs with that same keystore. Install the stable-key APK once; future builds signed by the same key can update it without uninstalling. An APK already installed with a different debug certificate must be replaced once before this stable update path can be used.
+After these secrets are configured, the workflow signs debug and release APKs with that same keystore. Install the stable-key APK once; future builds signed by the same key can update it without uninstalling. To publish a GitHub Release, manually run the workflow and enable `publish_release`. An APK already installed with a different debug certificate must be replaced once before this stable update path can be used.
 
 When the secrets are absent, Actions still builds a debug APK so the source can be tested, but the runner-generated debug signature is not suitable for reliable in-place updates.
 

@@ -8,9 +8,15 @@ on:
       - "android-panic/**"
       - ".github/workflows/android-panic.yml"
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish the stable-signed APK as a GitHub Release"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -52,7 +58,16 @@ jobs:
             echo "Stable app signing is enabled."
           else
             echo "ROOT_PANIC_STABLE_SIGNING=false" >> "$GITHUB_ENV"
-            echo "::warning::Stable signing secrets are not configured. This APK uses the runner debug key and cannot be relied on for in-place updates from future workflow runs."
+            echo "::warning::Stable signing secrets are not configured. This APK cannot be relied on for in-place updates."
+          fi
+
+      - name: Require stable signing for a public release
+        if: ${{ inputs.publish_release == true }}
+        shell: bash
+        run: |
+          if [ "$ROOT_PANIC_STABLE_SIGNING" != "true" ]; then
+            echo "::error::Configure all four ROOT_PANIC_KEYSTORE_* repository secrets before publishing a release."
+            exit 1
           fi
 
       - name: Build debug APK
@@ -68,6 +83,7 @@ jobs:
           test -s android-panic/app/build/outputs/apk/debug/app-debug.apk
           if [ "$ROOT_PANIC_STABLE_SIGNING" = "true" ]; then
             test -s android-panic/app/build/outputs/apk/release/app-release.apk
+            cp android-panic/app/build/outputs/apk/release/app-release.apk Root-Panic-v1.3.apk
           fi
           echo "APK output verification passed."
 
@@ -76,22 +92,33 @@ jobs:
         run: |
           {
             echo "## Root Panic build"
-            echo "- Version: 1.2 (code 3)"
+            echo "- Version: 1.3 (code 4)"
             if [ "$ROOT_PANIC_STABLE_SIGNING" = "true" ]; then
               echo "- Signature: stable upload key"
-              echo "- Update install: supported over previous APKs signed with this same key"
+              echo "- Update install: compatible with installs signed by this same key"
             else
               echo "- Signature: temporary GitHub runner debug key"
-              echo "- Configure the four ROOT_PANIC_KEYSTORE_* repository secrets for stable in-place updates"
+              echo "- Stable Release APK: not built"
+              echo "- Configure the four ROOT_PANIC_KEYSTORE_* repository secrets for signed releases"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Root-Panic-APKs
+          name: Root-Panic-v1.3-APKs
           path: |
             android-panic/app/build/outputs/apk/debug/app-debug.apk
-            android-panic/app/build/outputs/apk/release/app-release.apk
+            Root-Panic-v1.3.apk
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.publish_release == true && env.ROOT_PANIC_STABLE_SIGNING == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.3
+          name: Root Panic v1.3
+          body_path: android-panic/RELEASE_NOTES.md
+          files: Root-Panic-v1.3.apk
+          fail_on_unmatched_files: true

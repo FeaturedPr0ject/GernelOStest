@@ -27,7 +27,7 @@ internal object ReleaseUpdater {
     private const val RELEASE_API = "https://api.github.com/repos/FeaturedPr0ject/GernelOStest/releases/latest"
     private const val MAX_APK_SIZE = 100L * 1024L * 1024L
 
-    fun check(context: Context): UpdateCheckResult {
+    fun check(): UpdateCheckResult {
         var connection: HttpURLConnection? = null
         return try {
             val active = URL(RELEASE_API).openConnection() as HttpURLConnection
