@@ -447,6 +447,13 @@ private fun RootPanicApp(
         }
     }
 
+    LaunchedEffect(Unit) {
+        delay(700)
+        val result = onCheckUpdates()
+        availableUpdate = result.update
+        updateStatus = result.message
+    }
+
     LaunchedEffect(selectedPage) {
         if (selectedPage == "System Log") {
             status = "Live System Log • updates every 0.4 seconds"
@@ -519,6 +526,35 @@ private fun RootPanicApp(
                     .padding(horizontal = 20.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                availableUpdate?.let { update ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = AppSurfaceAlt),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Text("UPDATE AVAILABLE", color = AppPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(update.name, color = AppText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Version " + update.tag + " is ready to download.", color = AppMuted, fontSize = 13.sp)
+                            if (update.notes.isNotBlank()) {
+                                Text(update.notes.take(350), color = AppText, fontSize = 12.sp, lineHeight = 17.sp)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    enabled = !busy,
+                                    onClick = {
+                                        perform({ onInstallUpdate(update) }) {
+                                            updateStatus = it
+                                            status = it
+                                            if (it.contains("installed successfully", true)) availableUpdate = null
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Update now") }
+                                TextButton(onClick = { availableUpdate = null }) { Text("Later") }
+                            }
+                        }
+                    }
+                }
                 when (selectedPage) {
                     "Welcome" -> {
                         Text("WELCOME", fontSize = 13.sp, color = AppPrimary, fontWeight = FontWeight.Bold)
@@ -725,29 +761,26 @@ private fun RootPanicApp(
                                 Text("APP INFORMATION", color = AppMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 Text("Author: FeaturedPr0ject", color = AppText, fontSize = 14.sp)
                                 Text("GitHub: " + GITHUB_REPOSITORY, color = AppMuted, fontSize = 11.sp)
-                                Text("Tap the version label five times to check the latest GitHub release.", color = AppMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                                Text("Updates are checked automatically whenever Root Panic opens.", color = AppMuted, fontSize = 12.sp, lineHeight = 17.sp)
                                 Text(
                                     "Root Panic • v" + BuildConfig.VERSION_NAME,
                                     color = AppPrimary,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .align(Alignment.CenterHorizontally)
-                                        .clickable {
-                                            val now = SystemClock.elapsedRealtime()
-                                            versionTapCount = if (now - lastVersionTap > 2500L) 1 else versionTapCount + 1
-                                            lastVersionTap = now
-                                            if (versionTapCount >= 5) {
-                                                versionTapCount = 0
-                                                perform(onCheckUpdates) {
-                                                    updateStatus = it
-                                                    status = "Update check completed"
-                                                }
-                                            }
-                                        }
-                                        .padding(12.dp)
+                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(8.dp)
                                 )
                                 Text(updateStatus, color = AppMuted, fontSize = 12.sp, lineHeight = 18.sp)
+                                OutlinedButton(
+                                    enabled = !busy,
+                                    onClick = {
+                                        perform({ onCheckUpdates() }) {
+                                            availableUpdate = it.update
+                                            updateStatus = it.message
+                                            status = "Update check completed"
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Check for updates now") }
                                 TextButton(onClick = onOpenGithub, modifier = Modifier.fillMaxWidth()) {
                                     Text("Open author GitHub profile")
                                 }
